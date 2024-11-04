@@ -1,0 +1,64 @@
+name: CI template
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Determine next version
+      run: |
+        latest_tag=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "")
+        echo "Latest tag: $latest_tag"
+        if [[ -z "$latest_tag" ]]; then
+          next_version="v0.1.0"
+        else
+          next_version=$(echo $latest_tag | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+        fi
+        echo "Next version: $next_version"
+        echo "version=$next_version" >> $GITHUB_ENV
+
+    - name: Build container image
+      run: |
+        docker build -t ghcr.io/${{ github.repository }}:${{ env.version }} .
+
+    - name: Log in to registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Push container image
+      run: |
+        docker push ghcr.io/${{ github.repository }}:${{ env.version }}
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build the application
+      run: npm run build
+
+    - name: Run tests
+      run: npm test
