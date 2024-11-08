@@ -1,4 +1,4 @@
-FROM node:18
+FROM node:22
 
 LABEL org.opencontainers.image.source=https://github.com/giantswarm/${repository-name}
 LABEL org.opencontainers.image.description=${repository-description}
